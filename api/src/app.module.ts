@@ -7,6 +7,7 @@ import { AuthModule } from './auth/auth.module';
 import { CommonModule } from './common/common.module';
 import { EventModule } from './event/event.module';
 import { UserModule } from './user/user.module';
+import { TicketModule } from './ticket/ticket.module';
 
 @Module({
 	imports: [
@@ -32,6 +33,7 @@ import { UserModule } from './user/user.module';
 		UserModule,
 		EventModule,
 		CommonModule,
+		TicketModule,
 	],
 	controllers: [AppController],
 })

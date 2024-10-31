@@ -26,6 +26,18 @@ export class EventService {
 	async findOne(eventId: string) {
 		const event = await this.prismaService.event.findUnique({
 			where: { id: eventId },
+			include: {
+				tickets: {
+					select: {
+						id: true,
+						name: true,
+						description: true,
+						price: true,
+						totalTickets: true,
+						remainingTickets: true,
+					},
+				},
+			},
 		});
 
 		if (!event) {
