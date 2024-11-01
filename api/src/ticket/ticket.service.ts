@@ -60,6 +60,8 @@ export class TicketService {
 			where: { id: ticketId },
 			select: {
 				id: true,
+				totalTickets: true,
+				remainingTickets: true,
 				event: {
 					select: {
 						ownerId: true,
@@ -80,10 +82,33 @@ export class TicketService {
 			throw new HttpException('Unauthorized', HttpStatus.FORBIDDEN);
 		}
 
+		// Start updateData with the initial DTO
+		const updateData: UpdateTicketDto & { remainingTickets?: number } = {
+			...updateTicketDto,
+		};
+
+		// Adjust remainingTickets if totalTickets is updated
+		if (updateTicketDto.totalTickets !== undefined) {
+			const difference =
+				updateTicketDto.totalTickets - ticket.totalTickets;
+
+			if (difference < 0) {
+				// Reduced tickets
+				updateData.remainingTickets = Math.max(
+					ticket.remainingTickets + difference,
+					0,
+				);
+			} else {
+				// Added tickets
+				updateData.remainingTickets =
+					ticket.remainingTickets + difference;
+			}
+		}
+
 		// Update ticket
 		return this.prismaService.ticket.update({
 			where: { id: ticketId },
-			data: { ...updateTicketDto },
+			data: { ...updateData },
 		});
 	}
 
