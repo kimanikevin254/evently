@@ -82,7 +82,22 @@ export class TicketService {
 			throw new HttpException('Unauthorized', HttpStatus.FORBIDDEN);
 		}
 
-		// Start updateData with the initial DTO
+		// totalTickets cannot be lower than tickets sold to honor already sold tickets
+		// Calculate tickets sold
+		const ticketsSold = ticket.totalTickets - ticket.remainingTickets;
+
+		// Check if totalTickets update would violate the rule
+		if (
+			updateTicketDto.totalTickets !== undefined &&
+			updateTicketDto.totalTickets < ticketsSold
+		) {
+			throw new HttpException(
+				`Total tickets cannot be less than tickets sold (${ticketsSold})`,
+				HttpStatus.BAD_REQUEST,
+			);
+		}
+
+		// Define updateData with the initial DTO
 		const updateData: UpdateTicketDto & { remainingTickets?: number } = {
 			...updateTicketDto,
 		};
