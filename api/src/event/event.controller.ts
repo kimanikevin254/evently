@@ -54,7 +54,7 @@ export class EventController {
 	})
 	@Get(':eventId')
 	findOne(@Param('eventId') eventId: string) {
-		return this.eventService.findOne(eventId);
+		return this.eventService.findPublishedEvent(eventId);
 	}
 
 	@UseGuards(AuthGuard)

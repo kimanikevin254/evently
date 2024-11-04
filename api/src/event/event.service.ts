@@ -34,6 +34,21 @@ export class EventService {
 
 	async findOne(eventId: string) {
 		const event = await this.prismaService.event.findUnique({
+			where: { id: eventId },
+		});
+
+		if (!event) {
+			throw new HttpException(
+				'Event with specified ID does not exist',
+				HttpStatus.NOT_FOUND,
+			);
+		}
+
+		return event;
+	}
+
+	async findPublishedEvent(eventId: string) {
+		const event = await this.prismaService.event.findUnique({
 			where: { id: eventId, status: 'PUBLISHED' },
 		});
 
