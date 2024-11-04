@@ -1,4 +1,10 @@
-import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import {
+	forwardRef,
+	HttpException,
+	HttpStatus,
+	Inject,
+	Injectable,
+} from '@nestjs/common';
 import { CreateEventTicketsDto } from './dto/create-ticket.dto';
 import { UpdateTicketDto } from './dto/update-ticket.dto';
 import { PrismaService } from 'src/common/services/prisma.service';
@@ -8,8 +14,17 @@ import { EventService } from 'src/event/event.service';
 export class TicketService {
 	constructor(
 		private prismaService: PrismaService,
+		@Inject(forwardRef(() => EventService))
 		private eventService: EventService,
 	) {}
+
+	findEventTickets(eventId: string) {
+		return this.prismaService.ticket.findMany({
+			where: {
+				eventId,
+			},
+		});
+	}
 
 	async create(createEventTicketsDto: CreateEventTicketsDto, userId: string) {
 		// Retrieve event
@@ -22,8 +37,11 @@ export class TicketService {
 			throw new HttpException('Unauthorized', HttpStatus.FORBIDDEN);
 		}
 
+		// Find event tickets
+		const eventTickets = await this.findEventTickets(event.id);
+
 		// Make sure a ticket with the same name for the same event does not exist
-		const existingTicketNames = event.tickets.map((ticket) => ticket.name);
+		const existingTicketNames = eventTickets.map((ticket) => ticket.name);
 		const ticketNamesToCreate = createEventTicketsDto.tickets.map(
 			(ticket) => ticket.name,
 		);
@@ -48,6 +66,14 @@ export class TicketService {
 				remainingTickets: ticket.totalTickets, // Set remaining tickets to total tickets when creating tickets
 			})),
 		});
+	}
+
+	async findEventTicketsWithEventValidation(eventId: string) {
+		// Make sure event exists
+		const event = await this.eventService.findOne(eventId);
+
+		// Return tickets
+		return await this.findEventTickets(event.id);
 	}
 
 	async update(

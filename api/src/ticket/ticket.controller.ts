@@ -6,6 +6,8 @@ import {
 	Param,
 	Delete,
 	UseGuards,
+	Query,
+	Get,
 } from '@nestjs/common';
 import { TicketService } from './ticket.service';
 import { CreateEventTicketsDto } from './dto/create-ticket.dto';
@@ -14,6 +16,7 @@ import { AuthGuard } from 'src/auth/guards/auth.guard';
 import { ApiBearerAuth, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { User } from 'src/common/decorators/user.decorator';
 import { UserInterface } from 'src/common/interfaces/custom-request.interface';
+import { FindEventTicketsDto } from './dto/find-event-tickets.dto';
 
 @Controller('ticket')
 @UseGuards(AuthGuard)
@@ -32,6 +35,21 @@ export class TicketController {
 		@User() user: UserInterface,
 	) {
 		return this.ticketService.create(createEventTicketsDto, user.id);
+	}
+
+	@ApiResponse({
+		status: 404,
+		description: 'Event not found',
+	})
+	@ApiResponse({
+		status: 200,
+		description: 'Event tickets',
+	})
+	@Get()
+	findEventTickets(@Query() query: FindEventTicketsDto) {
+		return this.ticketService.findEventTicketsWithEventValidation(
+			query.eventId,
+		);
 	}
 
 	@ApiResponse({

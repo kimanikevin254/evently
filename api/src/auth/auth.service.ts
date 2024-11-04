@@ -32,7 +32,7 @@ export class AuthService {
 		try {
 			const accessToken = await this.jwtService.signAsync(
 				{ sub: userId },
-				{ expiresIn: '1h' },
+				{ expiresIn: '6h' },
 			);
 
 			const refreshToken = randomBytes(32).toString('hex');

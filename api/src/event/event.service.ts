@@ -1,14 +1,23 @@
-import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import {
+	forwardRef,
+	HttpException,
+	HttpStatus,
+	Inject,
+	Injectable,
+} from '@nestjs/common';
 import { PrismaService } from 'src/common/services/prisma.service';
 import { UserService } from 'src/user/user.service';
 import { CreateEventDto } from './dto/create-event.dto';
 import { UpdateEventDto } from './dto/update-event.dto';
+import { TicketService } from 'src/ticket/ticket.service';
 
 @Injectable()
 export class EventService {
 	constructor(
 		private prismaService: PrismaService,
 		private userService: UserService,
+		@Inject(forwardRef(() => TicketService))
+		private ticketService: TicketService,
 	) {}
 
 	create(createEventDto: CreateEventDto, userId: string) {
@@ -25,19 +34,7 @@ export class EventService {
 
 	async findOne(eventId: string) {
 		const event = await this.prismaService.event.findUnique({
-			where: { id: eventId },
-			include: {
-				tickets: {
-					select: {
-						id: true,
-						name: true,
-						description: true,
-						price: true,
-						totalTickets: true,
-						remainingTickets: true,
-					},
-				},
-			},
+			where: { id: eventId, status: 'PUBLISHED' },
 		});
 
 		if (!event) {
@@ -77,6 +74,20 @@ export class EventService {
 		// Make sure the user making the request owns the event
 		if (event.ownerId !== userId) {
 			throw new HttpException('Unauthorized', HttpStatus.FORBIDDEN);
+		}
+
+		// Make sure event does not have purchased tickets
+		const eventTickets = await this.ticketService.findEventTickets(eventId);
+
+		if (
+			eventTickets.some(
+				(event) => event.totalTickets !== event.remainingTickets,
+			)
+		) {
+			throw new HttpException(
+				'You cannot delete an event with purchased tickets',
+				HttpStatus.BAD_REQUEST,
+			);
 		}
 
 		// Delete
