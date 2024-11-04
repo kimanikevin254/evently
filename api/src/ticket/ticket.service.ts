@@ -82,6 +82,16 @@ export class TicketService {
 			throw new HttpException('Unauthorized', HttpStatus.FORBIDDEN);
 		}
 
+		// Do not allow ticket price change after the ticket has been bought
+		if (
+			updateTicketDto.price !== undefined &&
+			ticket.totalTickets !== ticket.remainingTickets
+		) {
+			throw new HttpException(
+				'You cannot update the ticket price for a ticket that has already been bought',
+				HttpStatus.BAD_REQUEST,
+			);
+		}
 		// totalTickets cannot be lower than tickets sold to honor already sold tickets
 		// Calculate tickets sold
 		const ticketsSold = ticket.totalTickets - ticket.remainingTickets;
