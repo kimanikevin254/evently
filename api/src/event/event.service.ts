@@ -96,7 +96,7 @@ export class EventService {
 		});
 	}
 
-	async findEventsByUserId(userId: string) {
+	async findUserEvents(userId: string) {
 		// Make sure user exists
 		const user = await this.userService.findOne({ id: userId });
 
@@ -110,5 +110,30 @@ export class EventService {
 		return this.prismaService.event.findMany({
 			where: { ownerId: userId },
 		});
+	}
+
+	async findUserEvent(userId: string, eventId: string) {
+		// Make sure user exists
+		const user = await this.userService.findOne({ id: userId });
+
+		if (!user) {
+			throw new HttpException(
+				'User with specified ID does not exist',
+				HttpStatus.NOT_FOUND,
+			);
+		}
+
+		const event = await this.prismaService.event.findFirst({
+			where: { id: eventId, ownerId: user.id },
+		});
+
+		if (!event) {
+			throw new HttpException(
+				'Event with specified ID does not exist',
+				HttpStatus.NOT_FOUND,
+			);
+		}
+
+		return event;
 	}
 }
