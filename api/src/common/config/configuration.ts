@@ -12,6 +12,7 @@ interface Config {
 	mailFrom: string;
 	appName: string;
 	frontendBaseUrl: string;
+	paystackSecretKey: string;
 }
 
 export default registerAs<Config>('config', () => ({
@@ -26,4 +27,5 @@ export default registerAs<Config>('config', () => ({
 	mailFrom: process.env.MAIL_FROM_ADDRESS,
 	appName: process.env.APPLICATION_NAME,
 	frontendBaseUrl: process.env.FRONTEND_BASE_URL,
+	paystackSecretKey: process.env.PAYSTACK_SECRET_KEY,
 }));

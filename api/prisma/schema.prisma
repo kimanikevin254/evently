@@ -92,15 +92,16 @@ model Ticket {
 }
 
 model TicketPurchase {
-  id           String    @id @default(uuid())
-  attendeeId   String
-  ticketTypeId String
-  quantity     Int
-  purchasedAt  DateTime  @default(now())
-  scannedAt    DateTime?
+  id          String    @id @default(uuid())
+  attendeeId  String
+  ticketId    String
+  quantity    Int
+  paystackRef String    @unique
+  paidAt      DateTime?
+  scannedAt   DateTime?
 
-  attendee   User   @relation(fields: [attendeeId], references: [id], onDelete: Cascade)
-  ticketType Ticket @relation(fields: [ticketTypeId], references: [id], onDelete: Cascade)
+  attendee User   @relation(fields: [attendeeId], references: [id], onDelete: Cascade)
+  ticket   Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
 }
 
 enum EventStatus {

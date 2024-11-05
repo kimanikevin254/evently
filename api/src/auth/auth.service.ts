@@ -98,15 +98,11 @@ export class AuthService {
 				userId: user.id,
 			};
 		} catch (error) {
-			// Check if the error is a Prisma Client Known Request Error => User does not exist
-			if (error instanceof PrismaClientKnownRequestError) {
-				if (error.code === 'P2025') {
-					// User not found
-					throw new HttpException(
-						'Incorrect credentials', // Don't tell the user that the user does not exist
-						HttpStatus.UNAUTHORIZED,
-					);
-				}
+			if (error.message === 'User does not exist') {
+				throw new HttpException(
+					'Incorrect credentials',
+					HttpStatus.UNAUTHORIZED,
+				);
 			}
 
 			if (error.message === 'Passwords do not match') {

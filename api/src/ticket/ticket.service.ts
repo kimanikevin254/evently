@@ -76,6 +76,21 @@ export class TicketService {
 		return await this.findEventTickets(event.id);
 	}
 
+	async findTicketById(ticketId: string) {
+		const ticket = await this.prismaService.ticket.findUnique({
+			where: { id: ticketId },
+		});
+
+		if (!ticket) {
+			throw new HttpException(
+				'Ticket with specified Id does not exist',
+				HttpStatus.NOT_FOUND,
+			);
+		}
+
+		return ticket;
+	}
+
 	async update(
 		ticketId: string,
 		updateTicketDto: UpdateTicketDto,
@@ -201,6 +216,20 @@ export class TicketService {
 			where: {
 				id: ticketId,
 			},
+		});
+	}
+
+	async adjustRemainingTicketsAfterPayment(
+		ticketId: string,
+		adjustBy: number,
+	) {
+		// Find ticket
+		const ticket = await this.findTicketById(ticketId);
+
+		// Adjust
+		return this.prismaService.ticket.update({
+			where: { id: ticketId },
+			data: { remainingTickets: ticket.remainingTickets - adjustBy },
 		});
 	}
 }

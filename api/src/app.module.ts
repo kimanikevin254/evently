@@ -8,6 +8,7 @@ import { CommonModule } from './common/common.module';
 import { EventModule } from './event/event.module';
 import { UserModule } from './user/user.module';
 import { TicketModule } from './ticket/ticket.module';
+import { PurchaseTicketModule } from './purchase-ticket/purchase-ticket.module';
 
 @Module({
 	imports: [
@@ -34,6 +35,7 @@ import { TicketModule } from './ticket/ticket.module';
 		EventModule,
 		CommonModule,
 		TicketModule,
+		PurchaseTicketModule,
 	],
 	controllers: [AppController],
 })
