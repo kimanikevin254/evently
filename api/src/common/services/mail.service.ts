@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import * as FormData from 'form-data';
 import Mailgun from 'mailgun.js';
 import * as fs from 'fs';
+import { randomBytes } from 'crypto';
 
 @Injectable()
 export class MailService {
@@ -67,7 +68,12 @@ export class MailService {
 		}
 	}
 
-	async sendTicketsMail(to: string, name: string, pdfs: string[]) {
+	async sendTicketsMail(
+		to: string,
+		name: string,
+		eventName: string,
+		pdfs: string[],
+	) {
 		try {
 			const htmlContent = `
 					<div style="font-family: Arial, sans-serif; color: #333; padding: 20px;">
@@ -81,10 +87,21 @@ export class MailService {
 					</div>
 				`;
 			// Attach the tickets (pdfs)
-			const attachments = pdfs.map((pdfPath) => ({
-				filename: pdfPath.split('/').pop(),
-				data: fs.createReadStream(pdfPath),
-			}));
+			const attachments = pdfs.map((pdfPath) => {
+				const randomSuffix = randomBytes(6)
+					.toString('base64')
+					.replace(/[^a-zA-Z0-9]/g, '')
+					.substring(0, 6)
+					.toUpperCase();
+
+				const baseName = `Ticket_${eventName.replace(/\s+/g, '_')}`; // Replace spaces with underscores
+				const fileName = `${baseName}_${randomSuffix}.pdf`;
+
+				return {
+					filename: fileName,
+					data: fs.createReadStream(pdfPath),
+				};
+			});
 
 			return await this.mailgunClient.messages.create(
 				this.MAILGUN_DOMAIN,

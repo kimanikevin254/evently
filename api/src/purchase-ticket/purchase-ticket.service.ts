@@ -177,6 +177,7 @@ export class PurchaseTicketService {
 			await this.mailService.sendTicketsMail(
 				ticketPurchases[0].purchasedBy.email,
 				ticketPurchases[0].purchasedBy.name,
+				ticketPurchases[0].ticket.event.name,
 				pdfsToSend,
 			);
 
