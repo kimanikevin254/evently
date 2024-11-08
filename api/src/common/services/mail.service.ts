@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as FormData from 'form-data';
 import Mailgun from 'mailgun.js';
+import * as fs from 'fs';
 
 @Injectable()
 export class MailService {
@@ -59,6 +60,40 @@ export class MailService {
 					to,
 					subject: 'Password Reset Request',
 					html: htmlContent,
+				},
+			);
+		} catch (error) {
+			throw error;
+		}
+	}
+
+	async sendTicketsMail(to: string, name: string, pdfs: string[]) {
+		try {
+			const htmlContent = `
+					<div style="font-family: Arial, sans-serif; color: #333; padding: 20px;">
+						<h2 style="color: #4CAF50;">Your Tickets</h2>
+						<p>Hello ${name.split(' ')[0]},</p>
+						<p>Thank you for your purchase. Please find your tickets attached to this email.</p>
+						<p>If you have any issues, feel free to contact our support team.</p>
+						<p>Thank you,<br>${this.APP_NAME} Team</p>
+						<hr />
+						<p style="font-size: 12px; color: #999;">This is an automated message. Please do not reply directly to this email.</p>
+					</div>
+				`;
+			// Attach the tickets (pdfs)
+			const attachments = pdfs.map((pdfPath) => ({
+				filename: pdfPath.split('/').pop(),
+				data: fs.createReadStream(pdfPath),
+			}));
+
+			return await this.mailgunClient.messages.create(
+				this.MAILGUN_DOMAIN,
+				{
+					from: this.MAIL_FROM,
+					to,
+					subject: 'Evently: Your Tickets',
+					html: htmlContent,
+					attachment: attachments,
 				},
 			);
 		} catch (error) {

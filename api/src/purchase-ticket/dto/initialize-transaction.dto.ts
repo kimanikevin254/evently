@@ -1,5 +1,12 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsNotEmpty, IsNumber, IsString, IsUUID } from 'class-validator';
+import {
+	IsArray,
+	IsNotEmpty,
+	IsNumber,
+	IsOptional,
+	IsString,
+	IsUUID,
+} from 'class-validator';
 
 export class InitializeTransactionDto {
 	@ApiProperty({
@@ -18,4 +25,14 @@ export class InitializeTransactionDto {
 	@IsNumber()
 	@IsNotEmpty()
 	quantity: number;
+
+	@ApiProperty({
+		description:
+			'Name(s) to appear on the ticket(s). Can be individual name(s) or a group name(s)',
+		example: ['Jane Doe'],
+	})
+	@IsArray()
+	@IsString({ each: true })
+	@IsOptional()
+	attendeeNames: string[];
 }

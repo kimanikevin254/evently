@@ -7,8 +7,10 @@ import { PrismaService } from 'src/common/services/prisma.service';
 import { TicketPurchase } from '@prisma/client';
 import { join } from 'path';
 import * as QRCode from 'qrcode';
-import { PDFDocument } from 'pdf-lib';
+import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 import * as fs from 'fs';
+import { ExtendedTicketPurchaseInterface } from './interfaces/extended-ticket-purchase.interface';
+import { MailService } from 'src/common/services/mail.service';
 
 @Injectable()
 export class PurchaseTicketService {
@@ -17,50 +19,62 @@ export class PurchaseTicketService {
 		private userService: UserService,
 		private ticketService: TicketService,
 		private prismaService: PrismaService,
+		private mailService: MailService,
 	) {}
 
-	private async findTicketPurchaseByPaystackRef(paystackRef: string) {
-		const ticketPurchase =
-			await this.prismaService.ticketPurchase.findUnique({
-				where: {
-					paystackRef,
-				},
-				include: {
-					ticket: {
-						select: {
-							id: true,
-							event: {
-								select: {
-									id: true,
-									name: true,
-								},
+	private async findTicketPurchasesByPaystackRef(
+		paystackRef: string,
+	): Promise<ExtendedTicketPurchaseInterface[]> {
+		return await this.prismaService.ticketPurchase.findMany({
+			where: {
+				paystackRef,
+			},
+			include: {
+				ticket: {
+					select: {
+						id: true,
+						name: true,
+						event: {
+							select: {
+								id: true,
+								name: true,
+								startDateTime: true,
+								address: true,
 							},
 						},
 					},
 				},
-			});
-
-		if (!ticketPurchase) {
-			throw new HttpException(
-				'Ticket purchase with the specified Paystack ref does not exist',
-				HttpStatus.NOT_FOUND,
-			);
-		}
-
-		return ticketPurchase;
+				purchasedBy: {
+					select: {
+						id: true,
+						name: true,
+						email: true,
+					},
+				},
+			},
+		});
 	}
 
 	async initializeTransaction(
 		userId: string,
 		initializeTransactionDto: InitializeTransactionDto,
 	) {
-		// Retrieve user details
-		const user = await this.userService.findOne({ id: userId });
-
 		// Retrieve ticket details
 		const ticket = await this.ticketService.findTicketById(
 			initializeTransactionDto.ticketId,
 		);
+
+		// Make sure the number of provided attendee names is equal to the requested tickets quantity
+		if (
+			ticket.requiresName &&
+			initializeTransactionDto?.attendeeNames?.length !==
+				initializeTransactionDto.quantity
+		) {
+			throw new HttpException(
+				'This ticket requires you to provide a list of attendee names with a length equal to number of tickets being purchased',
+				HttpStatus.BAD_REQUEST,
+			);
+		}
 
 		// Make sure remaining tickets is greater than or equal to requested quantity
 		if (ticket.remainingTickets < initializeTransactionDto.quantity) {
@@ -70,20 +84,38 @@ export class PurchaseTicketService {
 			);
 		}
 
+		// Retrieve user details
+		const user = await this.userService.findOne({ id: userId });
+
+		// Initialize transaction
 		const initializedTransaction: any =
 			await this.paystackService.initializePayment(
 				user.email,
 				ticket.price * initializeTransactionDto.quantity,
 			);
 
-		// Save to db
-		await this.prismaService.ticketPurchase.create({
-			data: {
-				attendeeId: user.id,
+		// Create multiple ticket purchase records with the same payment ref
+		const ticketPurchases: {
+			purchasedById: string;
+			ticketId: string;
+			paystackRef: string;
+			attendeeName: string | null;
+		}[] = [];
+
+		for (let i = 0; i < initializeTransactionDto.quantity; i++) {
+			ticketPurchases.push({
+				purchasedById: user.id,
 				ticketId: ticket.id,
-				quantity: initializeTransactionDto.quantity,
 				paystackRef: initializedTransaction.data.reference,
-			},
+				attendeeName: ticket.requiresName
+					? initializeTransactionDto.attendeeNames[i]
+					: null,
+			});
+		}
+
+		// Save to db
+		await this.prismaService.ticketPurchase.createMany({
+			data: ticketPurchases,
 		});
 
 		return initializedTransaction.data;
@@ -93,13 +125,19 @@ export class PurchaseTicketService {
 		// Handle successful charges
 		if (webhookData.event === 'charge.success') {
 			// Retrieve the ticket purchase
-			const ticketPurchase = await this.findTicketPurchaseByPaystackRef(
-				webhookData.data.reference,
+			const ticketPurchases = await this.findTicketPurchasesByPaystackRef(
+				webhookData.data.reference as string,
 			);
 
-			// Mark the ticket purchase as paid
-			await this.prismaService.ticketPurchase.update({
-				where: { id: ticketPurchase.id },
+			// Mark the ticket purchases as paid
+			const idsToUpdate = ticketPurchases.map((purchase) => purchase.id);
+
+			await this.prismaService.ticketPurchase.updateMany({
+				where: {
+					id: {
+						in: idsToUpdate,
+					},
+				},
 				data: {
 					paidAt: webhookData.data.paid_at,
 				},
@@ -107,18 +145,50 @@ export class PurchaseTicketService {
 
 			// Adjust the number of remaining tickets
 			await this.ticketService.adjustRemainingTicketsAfterPayment(
-				ticketPurchase.ticketId,
-				ticketPurchase.quantity,
+				ticketPurchases[0].ticketId,
+				idsToUpdate.length,
 			);
 
 			// Generate a purchased ticket pdf and send to user
-			const qrCodePath = await this.generateQRCode(ticketPurchase);
-			const pdfPath = await this.generateTicketPdf(
-				ticketPurchase,
-				qrCodePath,
+			return this.generateTicketAndSendToUser(ticketPurchases);
+		}
+	}
+
+	private async generateTicketAndSendToUser(
+		ticketPurchases: ExtendedTicketPurchaseInterface[],
+	) {
+		// Generate PDFs and QR codes and collect their paths
+		const filesToCleanUp = await Promise.all(
+			ticketPurchases.map(async (purchase) => {
+				const qrCodePath = await this.generateQRCode(purchase);
+				const pdfPath = await this.generateTicketPdf(
+					purchase,
+					qrCodePath,
+				);
+				return { pdfPath, qrCodePath };
+			}),
+		);
+
+		try {
+			// Extract only the PDF paths to send as attachments
+			const pdfsToSend = filesToCleanUp.map(({ pdfPath }) => pdfPath);
+
+			// Send the tickets via email
+			await this.mailService.sendTicketsMail(
+				ticketPurchases[0].purchasedBy.email,
+				ticketPurchases[0].purchasedBy.name,
+				pdfsToSend,
 			);
 
-			console.log(pdfPath);
+			// Clean up generated files (PDFs and QR codes)
+			await Promise.all(
+				filesToCleanUp.map(async ({ pdfPath, qrCodePath }) => {
+					await fs.promises.unlink(pdfPath); // Deletes the PDF file
+					await fs.promises.unlink(qrCodePath); // Deletes the QR code file
+				}),
+			);
+		} catch (error) {
+			console.log('An error occurred', error);
 		}
 	}
 
@@ -129,7 +199,8 @@ export class PurchaseTicketService {
 		});
 
 		// Define the directory and ensure it exists
-		const tempDir = join(__dirname, 'temp');
+		const tempDir = join(process.cwd(), 'temp');
+
 		if (!fs.existsSync(tempDir)) {
 			fs.mkdirSync(tempDir, { recursive: true });
 		}
@@ -142,10 +213,10 @@ export class PurchaseTicketService {
 	}
 
 	private async generateTicketPdf(
-		ticketPurchase: TicketPurchase,
+		ticketPurchase: ExtendedTicketPurchaseInterface,
 		qrCodePath: string,
 	) {
-		const tempDir = join(__dirname, 'temp');
+		const tempDir = join(process.cwd(), 'temp');
 		if (!fs.existsSync(tempDir)) {
 			fs.mkdirSync(tempDir, { recursive: true });
 		}
@@ -153,19 +224,114 @@ export class PurchaseTicketService {
 		const pdfPath = join(tempDir, `${ticketPurchase.id}.pdf`);
 
 		const pdfDoc = await PDFDocument.create();
-		const page = pdfDoc.addPage([600, 400]);
-		page.drawText(`Ticket for Event ID: ${ticketPurchase.ticketId}`, {
-			x: 50,
-			y: 350,
+		const page = pdfDoc.addPage([300, 150]);
+
+		const helveticaFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
+
+		// Set background color
+		page.drawRectangle({
+			x: 0,
+			y: 0,
+			width: page.getWidth(),
+			height: page.getHeight(),
+			color: rgb(
+				0.06666666666666667,
+				0.047058823529411764,
+				0.2549019607843137,
+			),
+		});
+
+		const eventName = ticketPurchase.ticket.event.name;
+
+		page.drawText(
+			eventName.length > 75 ? eventName.slice(0, 75) + '...' : eventName,
+			{
+				x: 10,
+				y: 130,
+				maxWidth: 150,
+				size: 12,
+				lineHeight: 14,
+				color: rgb(1, 1, 1),
+			},
+		);
+
+		page.drawText(
+			`Date: ${new Date(ticketPurchase.ticket.event.startDateTime).toDateString()}`,
+			{
+				x: 10,
+				y: 85,
+				maxWidth: 150,
+				size: 8,
+				lineHeight: 10,
+				color: rgb(1, 1, 1),
+			},
+		);
+
+		page.drawText(
+			`Time: ${new Date(ticketPurchase.ticket.event.startDateTime).toTimeString()}`,
+			{
+				x: 10,
+				y: 70,
+				maxWidth: 150,
+				size: 8,
+				lineHeight: 10,
+				color: rgb(1, 1, 1),
+			},
+		);
+
+		page.drawText(`Location: ${ticketPurchase.ticket.event.address}`, {
+			x: 10,
+			y: 45,
+			maxWidth: 150,
+			size: 8,
+			lineHeight: 10,
+			color: rgb(1, 1, 1),
+		});
+
+		page.drawLine({
+			start: { x: 170, y: 140 },
+			end: { x: 170, y: 10 },
+			thickness: 0.6,
+			color: rgb(1, 1, 1),
+		});
+
+		const ticketNameSize = 10;
+		const textWidth = helveticaFont.widthOfTextAtSize(
+			ticketPurchase.ticket.name,
+			ticketNameSize,
+		);
+
+		page.drawText(ticketPurchase.ticket.name, {
+			x: 170 + (300 - 170) / 2 - textWidth / 2,
+			y: 120,
+			size: ticketNameSize,
+			lineHeight: 10,
+			color: rgb(1, 1, 1),
 		});
 
 		const qrImage = await pdfDoc.embedPng(fs.readFileSync(qrCodePath));
 		page.drawImage(qrImage, {
-			x: 50,
-			y: 200,
-			width: 150,
-			height: 150,
+			x: 200,
+			y: 40,
+			width: 70,
+			height: 70,
 		});
+
+		if (ticketPurchase.attendeeName) {
+			const attendeeNameSize = 10;
+			const attendeeNameWidth = helveticaFont.widthOfTextAtSize(
+				ticketPurchase.attendeeName,
+				ticketNameSize,
+			);
+
+			page.drawText(ticketPurchase.attendeeName, {
+				x: 170 + (300 - 170) / 2 - attendeeNameWidth / 2,
+				y: 20,
+				size: attendeeNameSize,
+				lineHeight: 10,
+				color: rgb(1, 1, 1),
+			});
+		}
 
 		const pdfBytes = await pdfDoc.save();
 		fs.writeFileSync(pdfPath, pdfBytes);

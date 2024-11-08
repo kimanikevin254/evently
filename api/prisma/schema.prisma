@@ -82,6 +82,9 @@ model Ticket {
   totalTickets     Int
   remainingTickets Int
 
+  // Track if the name that should appear on the ticket should be provided
+  requiresName Boolean @default(false)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -92,16 +95,16 @@ model Ticket {
 }
 
 model TicketPurchase {
-  id          String    @id @default(uuid())
-  attendeeId  String
-  ticketId    String
-  quantity    Int
-  paystackRef String    @unique
-  paidAt      DateTime?
-  scannedAt   DateTime?
+  id            String    @id @default(uuid())
+  purchasedById String
+  ticketId      String
+  paystackRef   String
+  attendeeName  String?
+  paidAt        DateTime?
+  scannedAt     DateTime?
 
-  attendee User   @relation(fields: [attendeeId], references: [id], onDelete: Cascade)
-  ticket   Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  purchasedBy User   @relation(fields: [purchasedById], references: [id], onDelete: Cascade)
+  ticket      Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
 }
 
 enum EventStatus {

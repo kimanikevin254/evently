@@ -83,7 +83,7 @@ export class TicketService {
 
 		if (!ticket) {
 			throw new HttpException(
-				'Ticket with specified Id does not exist',
+				'Ticket with specified ID does not exist',
 				HttpStatus.NOT_FOUND,
 			);
 		}

@@ -2,6 +2,7 @@ import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
 	ArrayMinSize,
+	IsBoolean,
 	IsNotEmpty,
 	IsNumber,
 	IsOptional,
@@ -43,6 +44,13 @@ export class CreateTicketDto {
 	@IsNumber()
 	@Min(1)
 	totalTickets: number;
+
+	@ApiProperty({
+		description: 'Should names of attendees be printed on tickets',
+		example: true,
+	})
+	@IsBoolean()
+	requiresName: boolean;
 }
 
 export class CreateEventTicketsDto {
