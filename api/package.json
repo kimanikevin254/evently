@@ -1,8 +1,8 @@
 {
-  "name": "nest-auth",
+  "name": "evently",
   "version": "0.0.1",
   "description": "",
-  "author": "",
+  "author": "Kevin Kimani",
   "private": true,
   "license": "UNLICENSED",
   "scripts": {

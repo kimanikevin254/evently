@@ -1,4 +1,14 @@
 services:
+  api:
+    build: 
+      context: .
+    ports:
+      - 3000:3000
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - .env
   db:
     image: postgres
     restart: always
@@ -12,6 +22,11 @@ services:
       - ${DB_PORT}:5432
     volumes:
       - ./docker-data/db:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD", "pg_isready" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
   adminer:
     image: adminer
     restart: always
