@@ -18,6 +18,15 @@ export class UserController {
 
 	@ApiResponse({
 		status: 200,
+		description: 'Profile data',
+	})
+	@Get()
+	profile(@User() user: UserInterface) {
+		return this.userService.profile(user.id);
+	}
+
+	@ApiResponse({
+		status: 200,
 		description: 'My events',
 	})
 	@Get('my-events')

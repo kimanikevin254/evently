@@ -82,4 +82,13 @@ export class UserService {
 			);
 		}
 	}
+
+	async profile(userId: string) {
+		const user = await this.findOne({ id: userId });
+
+		// eslint-disable-next-line @typescript-eslint/no-unused-vars
+		const { passwordHash, ...rest } = user;
+
+		return rest;
+	}
 }
