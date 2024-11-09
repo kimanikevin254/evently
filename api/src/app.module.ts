@@ -9,6 +9,7 @@ import { EventModule } from './event/event.module';
 import { UserModule } from './user/user.module';
 import { TicketModule } from './ticket/ticket.module';
 import { PurchaseTicketModule } from './purchase-ticket/purchase-ticket.module';
+import { ScanPurchasedTicketModule } from './scan-purchased-ticket/scan-purchased-ticket.module';
 
 @Module({
 	imports: [
@@ -36,6 +37,7 @@ import { PurchaseTicketModule } from './purchase-ticket/purchase-ticket.module';
 		CommonModule,
 		TicketModule,
 		PurchaseTicketModule,
+		ScanPurchasedTicketModule,
 	],
 	controllers: [AppController],
 })

@@ -10,5 +10,6 @@ import { CommonModule } from 'src/common/common.module';
 	controllers: [PurchaseTicketController],
 	providers: [PurchaseTicketService, PaystackService],
 	imports: [UserModule, TicketModule, CommonModule],
+	exports: [PurchaseTicketService],
 })
 export class PurchaseTicketModule {}

@@ -22,6 +22,22 @@ export class PurchaseTicketService {
 		private mailService: MailService,
 	) {}
 
+	async retrieveTicketPurchasedById(purchasedTicketId: string) {
+		const ticketPurchase =
+			await this.prismaService.ticketPurchase.findUnique({
+				where: { id: purchasedTicketId },
+			});
+
+		if (!ticketPurchase) {
+			throw new HttpException(
+				'Ticket purchased with the specified ID does not exist',
+				HttpStatus.NOT_FOUND,
+			);
+		}
+
+		return ticketPurchase;
+	}
+
 	private async findTicketPurchasesByPaystackRef(
 		paystackRef: string,
 	): Promise<ExtendedTicketPurchaseInterface[]> {
